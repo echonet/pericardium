@@ -42,14 +42,16 @@ with torch.no_grad():
     
     if args.preset_manifest_path:
         print("\nHaving preset manifest path, using it to load the manifest file.")
+        print("if you want to calcluate AUC, the manifest file must contain 'pe_grade' and each grade columns.")
         manifest = pd.read_csv(args.preset_manifest_path)
         if 'split' not in manifest.columns:
             raise ValueError("Manifest file must contain 'split' columns.")
         
         manifest = process_manifest(manifest,
-                                    subsample= 0.1,
-                                    limit_columns= ["file_uid", "split"])
-        #if manifest["file_uid"] does not extension, add .avi
+                                    subsample= 0.9,
+                                    limit_columns= ["file_uid", "split", 
+                                                    "pe_grade", "pe_grade_none", "pe_grade_trivial", "pe_grade_small", "pe_grade_moderate", "pe_grade_large"])
+        
         if not manifest["file_uid"].str.endswith('.avi').all():
             print("Adding .avi extension to file_uid in the manifest.")
             manifest["file_uid"] = manifest["file_uid"] + ".avi"
@@ -178,6 +180,44 @@ with torch.no_grad():
     )
     
     print(f"Predict Pericardial effusion DETECTION -View {args.view}- was done. See {Output_path} and Calculate AUC")
+    
+    if "pe_grade" in manifest.columns:
+        # Calculate AUC for each class
+        # None (0), Trivial (1), Small (2), Moderate (3), Severe (4)
+        
+        #None 
+        y_turue_0 = manifest['pe_grade_none'].values
+        y_pred_0 = manifest_with_preds['preds_0'].values
+        auc_0 = roc_auc_score(y_turue_0, y_pred_0)
+        print(f"AUC for Pericardial Effusion None: {auc_0:.3f}")
+        
+        #Trivial
+        y_turue_1 = manifest['pe_grade_trivial'].values
+        y_pred_1 = manifest_with_preds['preds_1'].values
+        auc_1 = roc_auc_score(y_turue_1, y_pred_1)
+        print(f"AUC for Pericardial Effusion Trivial: {auc_1:.3f}")
+        
+        #Small
+        y_turue_2 = manifest['pe_grade_small'].values
+        y_pred_2 = manifest_with_preds['preds_2'].values
+        auc_2 = roc_auc_score(y_turue_2, y_pred_2)
+        print(f"AUC for Pericardial Effusion Small: {auc_2:.3f}")
+        
+        #Moderate
+        y_turue_3 = manifest['pe_grade_moderate'].values
+        y_pred_3 = manifest_with_preds['preds_3'].values
+        auc_3 = roc_auc_score(y_turue_3, y_pred_3)
+        print(f"AUC for Pericardial Effusion Moderate: {auc_3:.3f}")
+        
+        #Severe
+        y_turue_4 = manifest['pe_grade_large'].values
+        y_pred_4 = manifest_with_preds['preds_4'].values
+        auc_4 = roc_auc_score(y_turue_4, y_pred_4)
+        print(f"AUC for Pericardial Effusion Severe: {auc_4:.3f}")
+        
+    else:
+        print("No 'pe_grade' column in the manifest file. AUC calculation is skipped.")
+        
     
 # SAMPLE SCRIPT
 # python predict_pericardial_effusion.py  --dataset "/workspace/data/drives/sdb/pericardial_effusion_echo_video/"  --view A2C 
