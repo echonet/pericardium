@@ -4,3 +4,6 @@
 *.json
 *.xlsx
 *.xls
+
+/Output_Data
+/Output_Data/*
