@@ -98,7 +98,6 @@ with torch.no_grad():
         manifest.to_csv(manifest_path, index = False)
     
     #--------------------------------------------------
-    #Step: Opportunistic Liver Disease Screening
     print('--- Step: Pericardial Effusion Disease Prediction ---')
     print("Prediction Dataset view: ", args.view)
     print("Prediction Dataset path: ", data_path)
