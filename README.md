@@ -1,14 +1,20 @@
-# EchoNet-Effusion : XXXXXX
+# EchoNet-Pericardium : XXXXXX
 
+- Cardiac Tamponade Detection AI: Automated Diagnosis with AI
+Cardiac tamponade is a life-threatening condition where excess fluid around the heart impairs its function. 
+While prompt diagnosis and intervention are critical, current methods heavily rely on expert interpretation of echocardiograms.
 
-XXXXX
-XXXXX
-XXXXX
-XXXXX
-XXXXX
-XXXXX
+This project aims to develop a deep learning pipeline for the automated identification and assessment of Pericardial Effusion (PE) and Cardiac Tamponade from standard transthoracic echocardiogram videos.
 
-**Presentation:** XXXXXX
+This provides followings:
+
+ 1. Automated Detection: Automatically identifies the presence and severity of pericardial effusion using deep learning.
+ 2. Reduced Operator Dependence: Minimizes reliance on expert image interpretation, improving diagnostic consistency.
+ 3. Tamponade Risk Assessment: Evaluates the severity of pericardial effusion and the risk of progression to cardiac tamponade.
+ 4. High-Throughput Automation: Efficiently processes large volumes of echocardiogram videos for rapid diagnosis.
+
+![EchoNet-Pericardium Pipeline](https://github.com/echonet/pericardium/blob/main/Illustration_EchoNet_Pericardium.png)
+
 
 **Preprint:** Chiu IM, Vukadinovic M, Sahashi Y, Cheng PP, Cheng CY, Cheng S, Ouyang D. Automated Evaluation for Pericardial Effusion and Cardiac Tamponade with Echocardiographic Artificial Intelligence. medRxiv. 2024 Dec 1:2024.11.27.24318110. doi: 10.1101/2024.11.27.24318110. PMID: 39649606
 

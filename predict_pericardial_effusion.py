@@ -6,6 +6,7 @@ import math
 import glob
 import itertools
 from tqdm import tqdm
+tqdm.pandas()
 import cv2
 import argparse
 
