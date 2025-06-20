@@ -21,38 +21,80 @@ from sklearn.metrics import roc_auc_score, confusion_matrix, precision_recall_cu
 
 from utils import sensivity_specifity_cutoff, EchoDataset,get_frame_count, sigmoid
 
-def process_manifest(manifest):
+def process_manifest(manifest,
+                     subsample: float = None,
+                     limit_columns = ['filename', 'split']):
     manifest = manifest[manifest['split'] == 'test'].reset_index(drop=True)
-    manifest = manifest[['filename', 'split']]
+    manifest = manifest.sample(frac = subsample) if subsample else manifest
+    manifest = manifest[limit_columns] if limit_columns else manifest
     return manifest
 
 with torch.no_grad():
     device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 
     parser = argparse.ArgumentParser(description="Predict script for Liver disease Prediction From Echocardiography.")
-    parser.add_argument("--dataset", type=str, required=True, help="Path to the dataset directory.")
-    parser.add_argument("--view", type=str, required=True, choices = ['A4C', 'A2C', 'PLAX', 'PSAX', 'SC'] ,help="Echo dataset View")
+    parser.add_argument("--dataset", type=str, required = True, help="Path to the dataset directory.")
+    parser.add_argument("--view", type=str, required = True, choices = ['A4C', 'A2C', 'PLAX', 'PSAX', 'SC'] ,help="Echo dataset View")
+    parser.add_argument("--preset_manifest_path", type=str, required=False,help="preset_manifest_path which include video_data_path and split and labels")
     
     args = parser.parse_args()   
+    data_path = args.dataset
     
-    weights_path = f"/workspace/imin/Pericardium_Effusion_Public_Repo/pretrained_models/{args.view.lower()}_model_effusion.pt"
+    if args.preset_manifest_path:
+        print("\nHaving preset manifest path, using it to load the manifest file.")
+        print("if you want to calcluate AUC, the manifest file must contain 'pe_grade' and each grade columns.")
+        manifest = pd.read_csv(args.preset_manifest_path)
+        if 'split' not in manifest.columns:
+            raise ValueError("Manifest file must contain 'split' columns.")
+        
+        manifest = process_manifest(manifest,
+                                    subsample= 0.9,
+                                    limit_columns= ["file_uid", "split", 
+                                                    "pe_grade", "pe_grade_none", "pe_grade_trivial", "pe_grade_small", "pe_grade_moderate", "pe_grade_large"])
+        
+        if not manifest["file_uid"].str.endswith('.avi').all():
+            print("Adding .avi extension to file_uid in the manifest.")
+            manifest["file_uid"] = manifest["file_uid"] + ".avi"
+            #file_uid is like "video_1.avi", "video_2.avi" etc.
+        
+        if 'filename' not in manifest.columns:
+            print("Creating filename from file_uid and data_path.")
+            manifest["filename"] = manifest["file_uid"].apply(lambda x: os.path.join(data_path, f"{x}"))
+            #filename is like "/path/to/dataset/video_1.avi", "/path/to/dataset/video_2.avi" etc.
+        
+        if 'frames' not in manifest.columns:
+            print("Calculating frame counts for each video in the manifest.")
+            # Calculate frame counts for each video
+            manifest['frames'] = manifest["filename"].apply(lambda x: get_frame_count(os.path.join(args.dataset, f"{x}")))
+        manifest['frames'] = manifest["filename"].apply(lambda x: get_frame_count(os.path.join(args.dataset, f"{x}")))
+        manifest = manifest[manifest['frames'] > 31].reset_index(drop=True)
+        
+        manifest_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "manifest_tmp.csv")
+        manifest.to_csv(manifest_path, index = False)
     
-    data_path = args.dataset    #update the manifest file when needed
-    all_video_files_generator = glob.iglob(os.path.join(data_path, "*.avi"))
-    video_files = list(itertools.islice(all_video_files_generator, 1000))
-    
-    #Make manifest file from video files directory
-    manifest = pd.DataFrame({"filename": video_files})
-    manifest["split"] = "test"
-    manifest = process_manifest(manifest)
-    
-    manifest["file_uid"] = manifest["filename"].apply(lambda x: os.path.basename(x))
-    manifest['frames']=  manifest["filename"].apply(lambda x: get_frame_count(os.path.join(args.dataset, f"{x}")))
-    manifest = manifest[manifest['frames'] > 31].reset_index(drop=True)
-    
-    manifest_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "manifest.csv")
-    print(f"Manifest file was updated and saved to {manifest_path}")
-    manifest.to_csv(manifest_path, index = False)
+    elif not args.preset_manifest_path:
+        print("No preset manifest path provided, creating a new manifest file from the dataset directory.")
+        DEBUG_N = 1000 # if you want to use all, set it to None or a large/infinite number
+        #update the manifest file when needed
+        all_video_files_generator = glob.iglob(os.path.join(data_path, "*.avi"))
+        video_files = list(itertools.islice(all_video_files_generator, DEBUG_N))
+        
+        #Make manifest file from video files directory
+        manifest = pd.DataFrame({"filename": video_files})
+        manifest["split"] = "test"
+        manifest = process_manifest(manifest,
+                                    subsample= 0.1,
+                                    limit_columns= None)
+        
+        manifest["file_uid"] = manifest["filename"].apply(lambda x: os.path.basename(x))
+        manifest['frames']=  manifest["filename"].apply(lambda x: get_frame_count(os.path.join(args.dataset, f"{x}")))
+        manifest = manifest[manifest['frames'] > 31].reset_index(drop=True)
+        
+        manifest_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "manifest_tmp.csv")
+        print(f"Manifest file was updated and saved to {manifest_path}")
+        manifest.to_csv(manifest_path, index = False)
+        print("file_uid sample: ", manifest["file_uid"].sample(3).tolist())
+        print("filename sample: ", manifest["filename"].sample(3).tolist())
     
     #--------------------------------------------------
     #Step: Opportunistic Liver Disease Screening
@@ -80,6 +122,7 @@ with torch.no_grad():
         )
     
     #Model loading
+    weights_path = f"./pretrained_models/{args.view.lower()}_model_effusion.pt"
     pretrained_weights = torch.load(weights_path)
     new_state_dict = {}
     for k, v in pretrained_weights.items():
@@ -113,7 +156,8 @@ with torch.no_grad():
         predictions_3.extend(batch_preds[:, 3].tolist()) 
         predictions_4.extend(batch_preds[:, 4].tolist())
         
-    #numpy and sigmoid
+        
+    # Numpy and sigmoid
     predictions_0 = sigmoid(np.array(predictions_0))
     predictions_1 = sigmoid(np.array(predictions_1))
     predictions_2 = sigmoid(np.array(predictions_2))
@@ -129,16 +173,52 @@ with torch.no_grad():
                             
                             )
     manifest_with_preds = manifest.merge(df_preds, on="filename", how="inner").drop_duplicates('filename')
-    
+    Output_path = Path(os.path.dirname(os.path.abspath(__file__))) / "Output_Data" /Path(f"Effusion_detection_{args.view}.csv")
     manifest_with_preds.to_csv(
-        Path(os.path.dirname(os.path.abspath(__file__)))
-        / "Output_Data"
-        /
-        Path(f"Effusion_detection_{args.view}.csv"),
+        Output_path,
         index=False,
     )
     
-    print(f"Predict Pericardial effusion DETECTION -View {args.view}- was done. See Output csv and Calculate AUC")
+    print(f"Predict Pericardial effusion DETECTION -View {args.view}- was done. See {Output_path} and Calculate AUC")
     
-#SAMPLE SCRIPT
-#python predict_pericardial_effusion.py  --dataset "/workspace/data/drives/sdb/pericardial_effusion_echo_video/"  --view A4C
+    if "pe_grade" in manifest.columns:
+        # Calculate AUC for each class
+        # None (0), Trivial (1), Small (2), Moderate (3), Severe (4)
+        
+        #None 
+        y_turue_0 = manifest['pe_grade_none'].values
+        y_pred_0 = manifest_with_preds['preds_0'].values
+        auc_0 = roc_auc_score(y_turue_0, y_pred_0)
+        print(f"AUC for Pericardial Effusion None: {auc_0:.3f}")
+        
+        #Trivial
+        y_turue_1 = manifest['pe_grade_trivial'].values
+        y_pred_1 = manifest_with_preds['preds_1'].values
+        auc_1 = roc_auc_score(y_turue_1, y_pred_1)
+        print(f"AUC for Pericardial Effusion Trivial: {auc_1:.3f}")
+        
+        #Small
+        y_turue_2 = manifest['pe_grade_small'].values
+        y_pred_2 = manifest_with_preds['preds_2'].values
+        auc_2 = roc_auc_score(y_turue_2, y_pred_2)
+        print(f"AUC for Pericardial Effusion Small: {auc_2:.3f}")
+        
+        #Moderate
+        y_turue_3 = manifest['pe_grade_moderate'].values
+        y_pred_3 = manifest_with_preds['preds_3'].values
+        auc_3 = roc_auc_score(y_turue_3, y_pred_3)
+        print(f"AUC for Pericardial Effusion Moderate: {auc_3:.3f}")
+        
+        #Severe
+        y_turue_4 = manifest['pe_grade_large'].values
+        y_pred_4 = manifest_with_preds['preds_4'].values
+        auc_4 = roc_auc_score(y_turue_4, y_pred_4)
+        print(f"AUC for Pericardial Effusion Severe: {auc_4:.3f}")
+        
+    else:
+        print("No 'pe_grade' column in the manifest file. AUC calculation is skipped.")
+        
+    
+# SAMPLE SCRIPT
+# python predict_pericardial_effusion.py  --dataset "/workspace/data/drives/sdb/pericardial_effusion_echo_video/"  --view A2C 
+# --preset_manifest_path /workspace/imin/echo_tamponade_manifest/manifest_video_pe_tamponade_class_a2c.csv
