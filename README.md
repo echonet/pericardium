@@ -1,6 +1,5 @@
-# EchoNet-Pericardium : XXXXXX
+# EchoNet-Pericardium : Cardiac Tamponade Detection
 
-- Cardiac Tamponade Detection AI: Automated Diagnosis with AI
 Cardiac tamponade is a life-threatening condition where excess fluid around the heart impairs its function. 
 While prompt diagnosis and intervention are critical, current methods heavily rely on expert interpretation of echocardiograms.
 
