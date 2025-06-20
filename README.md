@@ -53,7 +53,18 @@ We released model weights (`/pretrained_models`) and inference code for binarize
 Please note that for cardiac tamponade, we used A4C video for training and inference.
 
 ```sh
-python predict.py  --dataset YOUR_112*112_EchoDataset  --label ['pericardial_effusion'] --view ['A4C']
+#(Option 1. if you did not manifest files that contains echo_file_uid, you can generate manifest file from dataset)
+python predict_pericardial_effusion.py  --dataset YOUR_112*112_EchoDataset  --view A2C
+python predict_pericardial_effusion.py  --dataset YOUR_112*112_EchoDataset  --view A4C
+python predict_pericardial_effusion.py  --dataset YOUR_112*112_EchoDataset  --view PLAX 
+...
+
+#(Option2. if you have manifest files that contains echo_file_uid and labels (ground-truth), you can run this and get each class AUC)
+python predict_pericardial_effusion.py  --dataset YOUR_112*112_EchoDataset  --view A2C --preset_manifest_path manifest_video_pe_tamponade_class_a2c.csv
+```
+
+```sh
+python predict_cardiac_tamponade.py  --dataset YOUR_112*112_EchoDataset  --view A4C --preset_manifest_path manifest_video_pe_tamponade_class_a4c.csv #For tamponade, we use A4C.
 ```
 
 Following running this code, you will get `Prediction_<VIEW>_<LABEL>.csv`. 
