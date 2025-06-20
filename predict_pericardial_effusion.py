@@ -95,8 +95,6 @@ with torch.no_grad():
         manifest_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "manifest_tmp.csv")
         print(f"Manifest file was updated and saved to {manifest_path}")
         manifest.to_csv(manifest_path, index = False)
-        print("file_uid sample: ", manifest["file_uid"].sample(3).tolist())
-        print("filename sample: ", manifest["filename"].sample(3).tolist())
     
     #--------------------------------------------------
     #Step: Opportunistic Liver Disease Screening
