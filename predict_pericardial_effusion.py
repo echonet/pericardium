@@ -17,7 +17,7 @@ from torchvision.models.video import r2plus1d_18
 
 from pathlib import Path
 from sklearn.utils import resample
-from sklearn.metrics import roc_auc_score, confusion_matrix, precision_recall_curve, auc, roc_curve
+from sklearn.metrics import roc_auc_score, precision_recall_curve
 
 from utils import sensivity_specifity_cutoff, EchoDataset,get_frame_count, sigmoid
 
@@ -62,11 +62,13 @@ with torch.no_grad():
             manifest["filename"] = manifest["file_uid"].apply(lambda x: os.path.join(data_path, f"{x}"))
             #filename is like "/path/to/dataset/video_1.avi", "/path/to/dataset/video_2.avi" etc.
         
-        if 'frames' not in manifest.columns:
-            print("Calculating frame counts for each video in the manifest.")
-            # Calculate frame counts for each video
-            manifest['frames'] = manifest["filename"].apply(lambda x: get_frame_count(os.path.join(args.dataset, f"{x}")))
-        manifest['frames'] = manifest["filename"].apply(lambda x: get_frame_count(os.path.join(args.dataset, f"{x}")))
+        #Options.
+        # if 'frames' not in manifest.columns:
+        #     print("Calculating frame counts for each video in the manifest.")
+        #     # Calculate frame counts for each video
+        #     manifest['frames'] = manifest["filename"].apply(lambda x: get_frame_count(os.path.join(args.dataset, f"{x}")))
+        
+        manifest['frames'] = manifest["filename"].progress_apply(lambda x: get_frame_count(os.path.join(args.dataset, f"{x}")))
         manifest = manifest[manifest['frames'] > 31].reset_index(drop=True)
         
         manifest_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "manifest_tmp.csv")
@@ -74,8 +76,8 @@ with torch.no_grad():
     
     elif not args.preset_manifest_path:
         print("No preset manifest path provided, creating a new manifest file from the dataset directory.")
-        DEBUG_N = 1000 # if you want to use all, set it to None or a large/infinite number
-        #update the manifest file when needed
+        DEBUG_N = 100 # if you want to use all, set it to None or a large/infinite number
+        #update the manifest file when needed, make generator for all video files
         all_video_files_generator = glob.iglob(os.path.join(data_path, "*.avi"))
         video_files = list(itertools.islice(all_video_files_generator, DEBUG_N))
         
@@ -83,7 +85,7 @@ with torch.no_grad():
         manifest = pd.DataFrame({"filename": video_files})
         manifest["split"] = "test"
         manifest = process_manifest(manifest,
-                                    subsample= 0.1,
+                                    # subsample= 0.1,
                                     limit_columns= None)
         
         manifest["file_uid"] = manifest["filename"].apply(lambda x: os.path.basename(x))
